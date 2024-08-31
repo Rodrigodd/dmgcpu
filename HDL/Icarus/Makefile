@@ -42,7 +42,9 @@ VERILATOR_OPTS=\
  -DWAVE_FILE=\"dmg_waves3.fst\"\
  --top-module SM83_Run\
  --cc\
- sm83.yosys.v\
+ sm83.verilator.v\
+ external_clk.v\
+ run.v\
  --timing\
  --trace-fst\
  --no-trace-top\
@@ -50,7 +52,7 @@ VERILATOR_OPTS=\
  --Wno-LATCH
 
 verilator:
-	verilator $(VERILATOR_OPTS) --binary -j 0
+	verilator $(VERILATOR_OPTS) --binary -j 0 --timing
 	obj_dir/VSM83_Run
 
 check:
@@ -70,5 +72,5 @@ yosys: yosys.ys
 	$(YOSYS) -s yosys.ys
 
 run_yosys:
-	iverilog -Wall -D ICARUS -s SM83_Run -o sm83.yosys.run sm83.yosys.v external_clk.v run.v -DROM=\"$(ROM)\" -DWAVE_FILE=\"dmg_waves2.fst\"
+	iverilog -g2012 -Wall -D ICARUS -s SM83_Run -o sm83.yosys.run sm83.yosys.v external_clk.v run.v -DROM=\"$(ROM)\" -DWAVE_FILE=\"dmg_waves2.fst\"
 	vvp sm83.yosys.run -fst

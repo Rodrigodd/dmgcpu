@@ -18,6 +18,11 @@ read_verilog \
 
 hierarchy -top SM83Core
 
+write_rtlil sm83.1.rtlil
+
+# add keep_hierarchy attribute to Sequencer
+setattr -mod -set keep_hierarchy 1 Sequencer
+
 flatten DataMux
 proc DataMux
 opt_clean -purge DataMux
@@ -51,8 +56,8 @@ flatten
 # splitnets w:azo_latched
 # splitnets
 # opt_clean
-tribuf -propagate
 opt_merge_wires SM83Core
+tribuf -propagate
 
 # flatten also remove unused modules
 read_verilog -icells <<EOT
@@ -65,7 +70,8 @@ module mybuskeeper(input a, x, output q);
 endmodule
 
 module mydff(input a, x, output q);
-    $dlatch #(.WIDTH(1), .EN_POLARITY(1)) dl1 (.D(a), .EN(x), .Q(q));
+    $dlatch #(.WIDTH(1), .EN_POLARITY(1)) 
+    dl1 (.D(a), .EN(x), .Q(q));
 endmodule
 
 module mybuskeeper8(input [7:0] a, input x, output  [7:0] q);
@@ -131,15 +137,32 @@ chtype -map BusKeeper mybuffer c:*perm_ff
 
 opt_clean SM83Core
 opt_merge
+opt_merge_wires
 
+cd SM83Core
+# select -assert-none t:$tribuf 
+select -assert-none t:BusKeeper 
+cd
 
 # replace signals driven by multiple tri-state buffers with a pmux
-# tribuf -merge -logic 
+tribuf -merge -logic 
+select w:A %ci1
+select -list
+select -clear
+tribuf -merge -logic -force w:A %ci1
+
+# From this point onwards, the design should be completely synthesizable
+# (ignoring the racing latches), so we can apply more aggressive optimizations.
+
+flatten
+opt_merge_wires
+opt_clean -purge
+opt
 
 # cd SM83Core
 # # select -assert-none t:$tribuf 
 # select -assert-none t:BusKeeper 
 # cd
 
-write_verilog sm83.yosys.v
+write_verilog -sv sm83.yosys.v
 write_rtlil sm83.yosys.rtlil
