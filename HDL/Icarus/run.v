@@ -105,7 +105,7 @@ module SM83_Run();
 		repeat (8) @ (posedge CLK);
 		ExternalRESET = 1'b0;
 
-		repeat (2048) @ (posedge CLK);
+		repeat (`CYCLES) @ (posedge CLK);
 
 		$display(""); // breakline after any serial output
 		$writememh ("out.mem", hw.mem);

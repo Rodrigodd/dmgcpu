@@ -20,8 +20,8 @@ hierarchy -top SM83Core
 
 write_rtlil sm83.1.rtlil
 
-# add keep_hierarchy attribute to Sequencer
-setattr -mod -set keep_hierarchy 1 Sequencer
+# # add keep_hierarchy attribute to Sequencer
+# setattr -mod -set keep_hierarchy 1 Sequencer
 
 flatten DataMux
 proc DataMux
@@ -32,7 +32,7 @@ opt_clean RegsBuses
 # Read the new module after the hierarchy command, otherwise the hierarchy
 # command will remove it. Did not find a way to prevent this.
 read_verilog -icells <<EOT
-// use to replace seq_sr_latch with internal cell $sr
+// used to replace seq_sr_latch with internal cell $sr
 module mysr (input nr, s, output q );
     $sr #(
         .SET_POLARITY(1'b1),
@@ -44,10 +44,38 @@ module mysr (input nr, s, output q );
         .Q(q)
     );
 endmodule
+
+// used to add a delay to seq_dff_posedge_comp, otherwise verilator evaluate
+// the signals in the wrong order.
+module mydff (d, clk, cclk, q);
+	input d;	
+	input clk;
+	input cclk;
+	output q;
+
+    wire i;
+    $delay #(
+        .DELAY(1),
+        .WIDTH(1)
+    ) d1 (
+        .A(d),
+        .Y(i)
+    );
+
+	reg val;
+	initial val = 1'b1;
+
+	always @(posedge clk) begin
+		val <= i;
+	end
+
+	assign q = val;
+endmodule
 EOT
 
 chtype -map seq_rs_latch mysr
 chtype -map seq_rs_latch2 mysr
+chtype -map seq_dff_posedge_comp mydff
 
 setattr -mod -set keep_hierarchy 1 BusKeeper
 proc * BusKeeper %d
@@ -156,6 +184,8 @@ tribuf -merge -logic -force w:A %ci1
 
 flatten
 opt_merge_wires
+# purging unused signals considerably speed things up, but we lose tracing for
+# many signals.
 opt_clean -purge
 opt
 

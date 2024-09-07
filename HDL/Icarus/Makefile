@@ -26,33 +26,43 @@ WAVE_FILE=dmg_waves.fst
 YOSYS = ~/repos/yosys/yosys
 
 run:
-	iverilog -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES) -DROM=\"$(ROM)\" -DWAVE_FILE=\"$(WAVE_FILE)\"
+	iverilog -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES) -DROM=\"$(ROM)\" -DWAVE_FILE=\"$(WAVE_FILE)\" -DCYCLES=20480
 	vvp sm83.run -fst
 
 low:
-	/bin/iverilog -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES) -DROM=\"$(ROM)\" -DWAVE_FILE=\"$(WAVE_FILE)\"
+	/bin/iverilog -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES) -DROM=\"$(ROM)\" -DWAVE_FILE=\"$(WAVE_FILE)\" -DCYCLES=20480
 	/bin/vvp sm83.run -fst
 
 verbose:
-	iverilog -v -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES) -DROM=\"$(ROM)\" -DWAVE_FILE=\"$(WAVE_FILE)\"
+	iverilog -v -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES) -DROM=\"$(ROM)\" -DWAVE_FILE=\"$(WAVE_FILE)\" -DCYCLES=20480
 	vvp -v sm83.run -fst
 
 VERILATOR_OPTS=\
  -DROM=\"$(ROM)\"\
  -DWAVE_FILE=\"dmg_waves3.fst\"\
+ -DCYCLES=20480\
  --top-module SM83_Run\
  --cc\
- sm83.verilator.v\
+ sm83.yosys.v\
  external_clk.v\
  run.v\
  --timing\
  --trace-fst\
  --no-trace-top\
  --Wno-fatal\
- --Wno-LATCH
+ --Wno-LATCH\
+ --timescale "1ns/1ns"\
+ --x-initial unique\
 
 verilator:
-	verilator $(VERILATOR_OPTS) --binary -j 0 --timing
+	verilator $(VERILATOR_OPTS) --binary -j 0
+	# The Sequencer need that at least w83 to be initialized as 1
+	obj_dir/VSM83_Run +verilator+rand+reset+1
+
+verilator-pgo:
+	verilator $(VERILATOR_OPTS) --binary -j 0 -CFLAGS -fprofile-generate -LDFLAGS -fprofile-generate -DCYCLES=1024
+	obj_dir/VSM83_Run
+	verilator $(VERILATOR_OPTS) --binary -j 0 -CFLAGS "-fprofile-use -fprofile-correction"
 	obj_dir/VSM83_Run
 
 check:
@@ -72,5 +82,6 @@ yosys: yosys.ys
 	$(YOSYS) -s yosys.ys
 
 run_yosys:
-	iverilog -g2012 -Wall -D ICARUS -s SM83_Run -o sm83.yosys.run sm83.yosys.v external_clk.v run.v -DROM=\"$(ROM)\" -DWAVE_FILE=\"dmg_waves2.fst\"
+	echo "+timescale+1ns/1ns" > command_file.txt
+	iverilog -f command_file.txt -g2012 -Wall -D ICARUS -s SM83_Run -o sm83.yosys.run sm83.yosys.v external_clk.v run.v -DROM=\"$(ROM)\" -DWAVE_FILE=\"dmg_waves2.fst\" -DCYCLES=20480
 	vvp sm83.yosys.run -fst
