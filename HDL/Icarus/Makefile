@@ -24,7 +24,13 @@ ROM=roms/bogus_hw.mem
 WAVE_FILE=dmg_waves.fst
 CYCLES=20480
 
-YOSYS = ~/repos/yosys/yosys
+# Currently dmgcpu relies on a patched version of yosys.
+# Must be builded from source, from this branch: https://github.com/Rodrigodd/yosys/tree/dmgcpu-changes
+
+# DMG_YOSYS = /path/to/patched/yosys
+ifndef DMG_YOSYS
+$(error DMG_YOSYS is not set)
+endif
 
 run:
 	iverilog -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES) -DROM=\"$(ROM)\" -DWAVE_FILE=\"$(WAVE_FILE)\" -DCYCLES=$(CYCLES)
@@ -83,7 +89,7 @@ clean:
 
 # Use yosys to optmize the code, and write back as verilog
 yosys: yosys.ys
-	$(YOSYS) -s yosys.ys
+	$(DMG_YOSYS) -s yosys.ys
 
 run_yosys:
 	echo "+timescale+1ns/1ns" > command_file.txt
