@@ -20,17 +20,15 @@ hierarchy -top SM83Core
 
 write_rtlil sm83.1.rtlil
 
-# # add keep_hierarchy attribute to Sequencer
-# setattr -mod -set keep_hierarchy 1 Sequencer
-
+# I don't remember exactly why these steps are necessary, but they are.
 flatten DataMux
 proc DataMux
 opt_clean -purge DataMux
 opt_clean RegsBuses
-# show -prefix dm RegsBuses
 
-# Read the new module after the hierarchy command, otherwise the hierarchy
-# command will remove it. Did not find a way to prevent this.
+# Read new modules after `hierarchy` and `flatten`, otherwise they will be
+# removed.
+
 read_verilog -icells <<EOT
 // used to replace seq_sr_latch with internal cell $sr
 module mysr (input nr, s, output q );
@@ -47,7 +45,7 @@ endmodule
 
 // used to add a delay to seq_dff_posedge_comp, otherwise verilator evaluate
 // the signals in the wrong order.
-module mydff (d, clk, cclk, q);
+module myseqdff (d, clk, cclk, q);
 	input d;	
 	input clk;
 	input cclk;
@@ -75,19 +73,28 @@ EOT
 
 chtype -map seq_rs_latch mysr
 chtype -map seq_rs_latch2 mysr
-chtype -map seq_dff_posedge_comp mydff
+chtype -map seq_dff_posedge_comp myseqdff
 
+# avoid flattening BusKeeper, because it will be replaced by a $dlatch later on.
 setattr -mod -set keep_hierarchy 1 BusKeeper
 proc * BusKeeper %d
-# opt_merge
 flatten
-# splitnets w:azo_latched
-# splitnets
-# opt_clean
 opt_merge_wires SM83Core
+
+# find tribufs, and propragate them. The tribufs will propagate until they
+# reach a output port, a BusKeepr, or a internal bus. 
+#
+# tristates will reach `D` (data-bus) and `A` (address-bus), but only `D` need
+# to be a tristate, `A` will be removed.
+#
+# Tristates that reachs a BusKeeper, will be merged together into a `$dlatch`.
+#
+# Remaning tristates will be replaced by a mux.
 tribuf -propagate
 
-# flatten also remove unused modules
+# Prepare modules for extracting tribuf/MuxKeeper pairs, and replacing them by
+# `$dlatches`:
+
 read_verilog -icells <<EOT
 // used to replace tribuffer/buskeeper pair with a $dlatch
 module mybuskeeper(input a, x, output q);
@@ -152,12 +159,11 @@ design -copy-to mybuskeepermap8 mybuskeeper8
 design -copy-to mybuskeepermap332 mybuskeeper332
 
 extract -map %mybuskeepermap SM83Core
-chtype -map mybuskeeper mydff
-
 extract -map %mybuskeepermap8 SM83Core
-chtype -map mybuskeeper8 mydff8
-
 extract -map %mybuskeepermap332 SM83Core
+
+chtype -map mybuskeeper mydff
+chtype -map mybuskeeper8 mydff8
 chtype -map mybuskeeper332 mydff332
 
 # perm_ff is strangely always driven
@@ -167,32 +173,30 @@ opt_clean SM83Core
 opt_merge
 opt_merge_wires
 
+# There now should be no BusKeeper
 cd SM83Core
-# select -assert-none t:$tribuf 
 select -assert-none t:BusKeeper 
 cd
 
-# replace signals driven by multiple tri-state buffers with a pmux
+# replace remaining tristates with pmux (except output ports)
 tribuf -merge -logic 
-select w:A %ci1
-select -list
-select -clear
+
+# A is a output port, but it does not need to be a tri-state buffer
 tribuf -merge -logic -force w:A %ci1
 
 # From this point onwards, the design should be completely synthesizable
-# (ignoring the racing latches), so we can apply more aggressive optimizations.
+# (hopefully). So we can apply more aggressive optimizations.
 
 flatten
 opt_merge_wires
 # purging unused signals considerably speed things up, but we lose tracing for
-# many signals.
+# many internal signals.
 opt_clean -purge
 opt
 
-# cd SM83Core
-# # select -assert-none t:$tribuf 
-# select -assert-none t:BusKeeper 
-# cd
-
+# Write the code back to SystemVerilog. SystemVerilog contains a little more of
+# semanthic information that helps Verilator.
 write_verilog -sv sm83.yosys.v
-write_rtlil sm83.yosys.rtlil
+
+# Write the RTLIL text represenation, for debugging.
+# write_rtlil sm83.yosys.rtlil
