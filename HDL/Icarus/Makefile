@@ -22,25 +22,26 @@ SOURCES =\
 
 ROM=roms/bogus_hw.mem
 WAVE_FILE=dmg_waves.fst
+CYCLES=20480
 
 YOSYS = ~/repos/yosys/yosys
 
 run:
-	iverilog -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES) -DROM=\"$(ROM)\" -DWAVE_FILE=\"$(WAVE_FILE)\" -DCYCLES=20480
+	iverilog -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES) -DROM=\"$(ROM)\" -DWAVE_FILE=\"$(WAVE_FILE)\" -DCYCLES=$(CYCLES)
 	vvp sm83.run -fst
 
 low:
-	/bin/iverilog -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES) -DROM=\"$(ROM)\" -DWAVE_FILE=\"$(WAVE_FILE)\" -DCYCLES=20480
+	/bin/iverilog -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES) -DROM=\"$(ROM)\" -DWAVE_FILE=\"$(WAVE_FILE)\" -DCYCLES=$(CYCLES)
 	/bin/vvp sm83.run -fst
 
 verbose:
-	iverilog -v -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES) -DROM=\"$(ROM)\" -DWAVE_FILE=\"$(WAVE_FILE)\" -DCYCLES=20480
+	iverilog -v -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES) -DROM=\"$(ROM)\" -DWAVE_FILE=\"$(WAVE_FILE)\" -DCYCLES=$(CYCLES)
 	vvp -v sm83.run -fst
 
 VERILATOR_OPTS=\
  -DROM=\"$(ROM)\"\
  -DWAVE_FILE=\"dmg_waves3.fst\"\
- -DCYCLES=20480\
+ -DCYCLES=$(CYCLES)\
  --top-module SM83_Run\
  --cc\
  sm83.yosys.v\
@@ -56,14 +57,17 @@ VERILATOR_OPTS=\
 
 verilator:
 	verilator $(VERILATOR_OPTS) --binary -j 0
-	# The Sequencer need that at least w83 to be initialized as 1
 	obj_dir/VSM83_Run +verilator+rand+reset+1
 
 verilator-pgo:
 	verilator $(VERILATOR_OPTS) --binary -j 0 -CFLAGS -fprofile-generate -LDFLAGS -fprofile-generate -DCYCLES=1024
 	obj_dir/VSM83_Run
 	verilator $(VERILATOR_OPTS) --binary -j 0 -CFLAGS "-fprofile-use -fprofile-correction"
-	obj_dir/VSM83_Run
+	obj_dir/VSM83_Run +verilator+rand+reset+1
+
+run_verilator:
+	# The Sequencer need that at least w83 to be initialized as 1, so we pass +rand+reset+1
+	obj_dir/VSM83_Run +verilator+rand+reset+1
 
 check:
 	verilator $(VERILATOR_OPTS) --lint-only --report-unoptflat
@@ -83,5 +87,5 @@ yosys: yosys.ys
 
 run_yosys:
 	echo "+timescale+1ns/1ns" > command_file.txt
-	iverilog -f command_file.txt -g2012 -Wall -D ICARUS -s SM83_Run -o sm83.yosys.run sm83.yosys.v external_clk.v run.v -DROM=\"$(ROM)\" -DWAVE_FILE=\"dmg_waves2.fst\" -DCYCLES=20480
+	iverilog -f command_file.txt -g2012 -Wall -D ICARUS -s SM83_Run -o sm83.yosys.run sm83.yosys.v external_clk.v run.v -DROM=\"$(ROM)\" -DWAVE_FILE=\"dmg_waves2.fst\" -DCYCLES=$(CYCLES)
 	vvp sm83.yosys.run -fst
