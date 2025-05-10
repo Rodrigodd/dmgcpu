@@ -18,6 +18,7 @@ CPU =\
 SOURCES =\
  $(CPU)\
  external_clk.v\
+ bogus_soc.v\
  run.v
 
 ROM=roms/bogus_hw.mem
@@ -44,6 +45,7 @@ VERILATOR_OPTS=\
  --cc\
  sm83.yosys.v\
  external_clk.v\
+ bogus_soc.v\
  run.v\
  --timing\
  --trace-fst\
