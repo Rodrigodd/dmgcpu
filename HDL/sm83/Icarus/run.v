@@ -42,6 +42,7 @@ module SM83_Run();
 
 	Bogus_HW hw (
 		.CLK(CLK),
+		.DATA_CLK(DATA_CLK_N),
 		.RESET(ExternalRESET),
 		.MREQ(MemReq),
 		.RD(RD),
@@ -126,7 +127,7 @@ module SM83_Run();
 
 endmodule // SM83_Run
 
-module Bogus_HW ( CLK, RESET, MREQ, RD, WR, databus, addrbus, CPU_IRQ_TRIG, CPU_IRQ_ACK );
+module Bogus_HW (CLK, DATA_CLK, RESET, MREQ, RD, WR, databus, addrbus, CPU_IRQ_TRIG, CPU_IRQ_ACK );
 
 	reg [32*8:0] ROM = "roms/bogus_hw.mem";
 	reg [32*8:0] BOOT = "roms/boot.mem";
@@ -134,7 +135,7 @@ module Bogus_HW ( CLK, RESET, MREQ, RD, WR, databus, addrbus, CPU_IRQ_TRIG, CPU_
 	initial begin 
 	end
 
-	input CLK;
+	input CLK, DATA_CLK;
 	input RESET;
 	input MREQ;
 	input RD;
@@ -143,9 +144,6 @@ module Bogus_HW ( CLK, RESET, MREQ, RD, WR, databus, addrbus, CPU_IRQ_TRIG, CPU_
 	input [15:0] addrbus;
 	output [7:0] CPU_IRQ_TRIG;
 	input [7:0] CPU_IRQ_ACK;
-
-	wire [15:0] ADR;
-	wire [7:0] DAT;
 
 	localparam REG_SERIAL_DATA = 16'hFF01;
 	localparam REG_SERIAL_CONTROL = 16'hFF02;
@@ -249,39 +247,33 @@ module Bogus_HW ( CLK, RESET, MREQ, RD, WR, databus, addrbus, CPU_IRQ_TRIG, CPU_
 	end
 
 	assign value = in_boot ? bootrom[addrbus[7:0]]
-		: (ADR == REG_DIV) ? DIV[15:8]
-		: (ADR == REG_TIMA) ? TIMA
-		: (ADR == REG_TMA) ? TMA
-		: (ADR == REG_TAC) ? {5'h1f, TAC}
-		: (ADR == REG_IF) ? {3'h7, IF}
-		: (ADR == REG_STAT) ? STAT
-		: (ADR >= 16'hff00 && ADR <= 16'hff7f) ? 8'hff // IO registers
-		: (ADR <= 16'h3fff) ? rom[addrbus]
-		: (ADR <= 16'h7fff) ? rom[{BANK_SELECTED[1:0], addrbus[13:0]}]
+		: (addrbus == REG_DIV) ? DIV[15:8]
+		: (addrbus == REG_TIMA) ? TIMA
+		: (addrbus == REG_TMA) ? TMA
+		: (addrbus == REG_TAC) ? {5'h1f, TAC}
+		: (addrbus == REG_IF) ? {3'h7, IF}
+		: (addrbus == REG_STAT) ? STAT
+		: (addrbus >= 16'hff00 && addrbus <= 16'hff7f) ? 8'hff // IO registers
+		: (addrbus <= 16'h3fff) ? rom[addrbus]
+		: (addrbus <= 16'h7fff) ? rom[{BANK_SELECTED[1:0], addrbus[13:0]}]
 		: mem[addrbus];
 
-	// the CPU changes the address bus and WR signal at the same time, which
-	// causes issues due to order evaluation. To work around this, we extend
-	// the address bus and data bus by one tick.
-	assign #1 ADR = addrbus;
-	assign #1 DAT = databus;
-
 	wire [7:0] serial_data = mem[REG_SERIAL_DATA];
-	wire serial_write = (ADR == REG_SERIAL_CONTROL);
+	wire serial_write = (addrbus == REG_SERIAL_CONTROL);
 
-	always @(negedge WR) begin
-		if (ADR == REG_DIV) DIV <= 0;
-		else if (ADR == REG_TIMA) TIMA <= DAT;
-		else if (ADR == REG_TMA) TMA <= DAT;
-		else if (ADR == REG_TAC) TAC <= DAT[2:0];
-		else if (ADR == REG_IF) IF <= DAT[4:0];
-		else if (ADR == REG_STAT) STAT <= DAT;
-		else if (ADR <= 16'h7fff) begin
+	always @(posedge DATA_CLK) if (WR) begin
+		if (addrbus == REG_DIV) DIV <= 0;
+		else if (addrbus == REG_TIMA) TIMA <= databus;
+		else if (addrbus == REG_TMA) TMA <= databus;
+		else if (addrbus == REG_TAC) TAC <= databus[2:0];
+		else if (addrbus == REG_IF) IF <= databus[4:0];
+		else if (addrbus == REG_STAT) STAT <= databus;
+		else if (addrbus <= 16'h7fff) begin
 			// ROM area, switch banks
-			BANK_SELECTED <= DAT[1:0];
+			BANK_SELECTED <= databus[1:0];
 		end
 		else
-			mem[ADR] <= DAT;
+			mem[addrbus] <= databus;
 
 		if (serial_write) begin
 			$write("%c", mem[REG_SERIAL_DATA]);
