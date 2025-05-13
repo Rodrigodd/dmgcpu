@@ -1,5 +1,6 @@
 # read verilog
 read_verilog \
+ bogus_soc.v\
  ../_GekkioNames.v\
  ../ALU.v\
  ../Bottom.v\
@@ -16,7 +17,11 @@ read_verilog \
  ../Thingy.v\
  ../Top.v\
 
-hierarchy -top SM83Core
+hierarchy -top Bogus_SoC
+
+setattr -mod -set keep_hierarchy 1 External_CLK
+delete External_CLK
+delete MBC
 
 # In DataMux, the buskeepers res_latch and dv_latch are unecessary, as Res and
 # DV are never tristate, so we just flatten them as simple Buffers here. For
@@ -24,7 +29,7 @@ hierarchy -top SM83Core
 # the `D` can be driven from outside the module. In that case we ensure in the
 # design that `D` is always driven.
 proc DataMux
-flatten data_mux_bit/c:res_latch data_mux_bit/c:dv_latch data_mux_bit/c:ext_to_int %%
+flatten data_mux_bit/c:res_latch data_mux_bit/c:dv_latch %%
 setattr -mod -set keep_hierarchy 1 BusKeeper
 flatten DataMux
 opt_clean -purge DataMux
@@ -111,6 +116,20 @@ module mydff(input a, x, output q);
     dl1 (.D(a), .EN(x), .Q(q));
 endmodule
 
+module mydffd(input a, x, output q);
+    wire i;
+    $delay #(
+        .DELAY(1),
+        .WIDTH(1)
+    ) d1 (
+        .A(a),
+        .Y(i)
+    );
+
+    $dlatch #(.WIDTH(1), .EN_POLARITY(1)) 
+    dl1 (.D(i), .EN(x), .Q(q));
+endmodule
+
 module mybuskeeper8(input [7:0] a, input x, output  [7:0] q);
     wire [7:0] z;
     $tribuf #(.WIDTH(8)) tb1 (.EN(x), .A(a), .Y(z));
@@ -156,18 +175,20 @@ module mybuffer(input d, output q);
 endmodule
 EOT
 
-opt_clean SM83Core
+opt_clean Bogus_SoC
 # Mege identical BusKeepers
-opt_merge -share_all SM83Core
+opt_merge -share_all Bogus_SoC
 
 design -copy-to mybuskeepermap mybuskeeper
 design -copy-to mybuskeepermap8 mybuskeeper8
 design -copy-to mybuskeepermap332 mybuskeeper332
 
-extract -map %mybuskeepermap SM83Core
-extract -map %mybuskeepermap8 SM83Core
-extract -map %mybuskeepermap332 SM83Core
+extract -map %mybuskeepermap Bogus_SoC
+extract -map %mybuskeepermap8 Bogus_SoC
+extract -map %mybuskeepermap332 Bogus_SoC
 
+show -prefix a w:\dmgcore.bot.regs.RegIR* %ci1
+chtype -map mybuskeeper mydffd w:\dmgcore.bot.regs.RegIR* %ci1
 chtype -map mybuskeeper mydff
 chtype -map mybuskeeper8 mydff8
 chtype -map mybuskeeper332 mydff332
@@ -175,11 +196,11 @@ chtype -map mybuskeeper332 mydff332
 # perm_ff is strangely always driven
 chtype -map BusKeeper mybuffer c:*perm_ff
 
-opt_clean SM83Core
+opt_clean Bogus_SoC
 opt_merge
 
 # There now should be no BusKeeper
-cd SM83Core
+cd Bogus_SoC
 select -assert-none t:BusKeeper 
 cd
 
@@ -197,7 +218,10 @@ opt
 
 # purging unused signals considerably speed things up, but we lose tracing for
 # many internal signals.
-opt_clean -purge
+# opt_clean -purge
+
+# show -prefix a w:\dmgcore.bot.regs.RegIR[7].d %ci6
+# show -prefix b c:$auto$tribuf.cc:675:merge$5068 %ci10
 
 # Write the code back to SystemVerilog. SystemVerilog contains a little more of
 # semanthic information that helps Verilator.

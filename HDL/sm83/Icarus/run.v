@@ -36,7 +36,7 @@ module SM83_Run();
 		repeat (CYCLES) @ (posedge CLK);
 
 		$display(""); // breakline after any serial output
-		$writememh ("out.mem", soc.hw.mem);
+		// $writememh ("out.mem", soc.hw.mem);
 		$finish;
 	end	
 

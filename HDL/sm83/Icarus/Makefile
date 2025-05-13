@@ -19,22 +19,25 @@ SOURCES =\
  $(CPU)\
  external_clk.v\
  bogus_soc.v\
+ mbc.v\
  run.v
 
 ROM=roms/bogus_hw.mem
 WAVE_FILE=dmg_waves.fst
 CYCLES=1024
 
+.PHONY: run low verbose clean check run_verilator run_verilator_pgo
+
 # Currently dmgcpu relies on a patched version of yosys.
 # Must be builded from source, from this branch: https://github.com/Rodrigodd/yosys/tree/dmgcpu-changes
 
 run:
 	iverilog -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES)
-	vvp sm83.run -fst "+ROM=$(ROM)" "+WAVE_FILE=$(WAVE_FILE)" "+CYCLES=$(CYCLES)"
+	vvp -i sm83.run -fst "+ROM=$(ROM)" "+WAVE_FILE=$(WAVE_FILE)" "+CYCLES=$(CYCLES)"
 
 low:
 	/bin/iverilog -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES)
-	/bin/vvp sm83.run -fst "+ROM=$(ROM)" "+WAVE_FILE=$(WAVE_FILE)" "+CYCLES=$(CYCLES)"
+	/bin/vvp -i sm83.run -fst "+ROM=$(ROM)" "+WAVE_FILE=$(WAVE_FILE)" "+CYCLES=$(CYCLES)"
 
 verbose:
 	iverilog -v -Wall -D ICARUS -s SM83_Run -o sm83.run $(SOURCES)
@@ -45,7 +48,7 @@ VERILATOR_OPTS=\
  --cc\
  sm83.yosys.v\
  external_clk.v\
- bogus_soc.v\
+ mbc.v\
  run.v\
  --timing\
  --trace-fst\
@@ -54,6 +57,7 @@ VERILATOR_OPTS=\
  --Wno-LATCH\
  --timescale "1ns/1ns"\
  --x-initial unique\
+ --autoflush\
 
 verilator:
 	verilator $(VERILATOR_OPTS) --binary -j 0 --Mdir verilator_build
