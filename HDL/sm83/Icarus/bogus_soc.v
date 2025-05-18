@@ -150,7 +150,10 @@ module Bogus_HW (CLK, DATA_CLK, RESET, MREQ, RD, WR, databus, addrbus, CPU_IRQ_T
 	wire [7:0] value;
 	wire [7:0] rom_value;
 
-	MBC mbc(.RESET(RESET), .DATA_CLK(DATA_CLK), .WR(WR), .addrbus(addrbus), .databus(databus), .value(rom_value));
+	wire [7:0] dbus;
+	BusKeeper data_latch [7:0] ( .d(databus), .q(dbus) );
+
+	MBC mbc(.RESET(RESET), .DATA_CLK(DATA_CLK), .WR(WR), .addrbus(addrbus), .databus(dbus), .value(rom_value));
 
 	assign CPU_IRQ_TRIG = IF;
 

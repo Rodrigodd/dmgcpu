@@ -95,10 +95,7 @@ module data_mux_bit ( clk, Test1, Res_to_DL, Res, Int_bus, Ext_bus, DataOut, dv_
 	assign Ext_bus = ~clk ? 1'b1
 			: RD_hack && ~WR_hack ? 1'bz
 			: ~RD_hack && WR_hack && ~int_to_ext_q ? 1'b0
-			// the branch below should be z, but due to limitations on how
-			// Verilator is currently used, we cannot simulate the buskeeper
-			// in the D bus.
-			: 1'b1;
+			: 1'bz;
 
 	// don't read from D if also reading from IE
 	wire IntRD_hack = RD_hack && !bot_to_Thingy_hack;
