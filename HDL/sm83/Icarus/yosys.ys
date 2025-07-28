@@ -24,10 +24,8 @@ delete External_CLK
 delete MBC
 
 # In DataMux, the buskeepers res_latch and dv_latch are unecessary, as Res and
-# DV are never tristate, so we just flatten them as simple Buffers here. For
-# ext_to_int we do the same, but because we cannot optimize its BusKeeper, as
-# the `D` can be driven from outside the module. In that case we ensure in the
-# design that `D` is always driven.
+# DV are never tristate, so we just flatten them as simple Buffers here. In
+# that case we ensure in the design that `D` is always driven.
 proc DataMux
 flatten data_mux_bit/c:res_latch data_mux_bit/c:dv_latch %%
 setattr -mod -set keep_hierarchy 1 BusKeeper
